@@ -1,16 +1,27 @@
-const { dequeue } = require("../queue/queue");
+const {
+    claimJob,
+    acknowledgeJob
+} = require("../queue/queue");
 
-function processNextJob() {
+async function processNextJob() {
 
-    const job = dequeue();
+    const result = await claimJob();
 
-    if (!job) {
+    if (!result) {
         return;
     }
 
-    job.status = "processing";
+    const { job, rawJob } = result;
+
     console.log(`Processing job: ${job.id}`);
+
+    job.status = "processing";
+
+    // Simulated job processing
     job.status = "completed";
+
+    await acknowledgeJob(rawJob);
+
     console.log(`Completed job: ${job.id}`);
 
     return job;
@@ -18,10 +29,13 @@ function processNextJob() {
 
 function startWorker() {
 
-    setInterval(() => {
-        processNextJob();
+    setInterval(async () => {
+        await processNextJob();
     }, 1000);
 
 }
 
-module.exports = { processNextJob, startWorker };
+module.exports = {
+    processNextJob,
+    startWorker
+};

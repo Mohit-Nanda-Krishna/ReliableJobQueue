@@ -1244,3 +1244,102 @@ and you'll implement them yourself.
 
 progress.md
 Document
+
+# Reliable Job Queue — Progress
+
+## Current Phase
+Phase 3 — Reliable Redis Job Processing
+
+## Completed
+
+### Phase 1 — Basic Queue
+- Express server created
+- `POST /jobs` endpoint implemented
+- Job creation using `crypto.randomUUID()`
+- In-memory FIFO queue implemented
+- Worker implemented
+- Automatic worker loop implemented
+- Job lifecycle: `pending → processing → completed`
+
+### Phase 2 — Redis Migration
+- Docker Desktop installed and configured
+- Redis running inside a Docker container
+- Node.js connected to Redis using the `redis` npm package
+- Redis List used as the queue
+- FIFO implemented using `LPUSH + RPOP`
+- JavaScript array queue replaced with Redis-backed queue
+
+### Phase 3 — Reliable Job Claiming
+- Added separate Redis ready and processing queues
+- `jobs:ready` stores jobs waiting for processing
+- `jobs:processing` stores jobs currently being processed
+- Implemented atomic job claiming using `RPOPLPUSH`
+- Worker now claims jobs instead of permanently removing them
+- Added job acknowledgement after successful processing
+- Successfully processed jobs are removed from the processing queue
+- Tested worker failure scenario: a claimed job remains in `jobs:processing` if the worker fails before acknowledgement
+
+## Current Architecture
+
+Client
+  ↓
+Express API
+  ↓
+Redis `jobs:ready`
+  ↓
+Atomic job claim
+  ↓
+Redis `jobs:processing`
+  ↓
+Worker
+  ↓
+Successful completion
+  ↓
+Acknowledgement
+  ↓
+Remove from processing
+
+## Concepts Learned
+- Redis
+- Docker
+- Docker images vs containers
+- Redis Lists
+- FIFO queues
+- Atomic operations
+- Job claiming
+- In-flight/processing jobs
+- Acknowledgement
+- Worker failure window
+- At-least-once processing implications
+
+## Current Limitations
+- Stale jobs in `jobs:processing` are not automatically recovered yet
+- No retry mechanism
+- No retry count
+- No exponential backoff
+- No Dead Letter Queue
+- No PostgreSQL persistence
+- No idempotency protection
+- No multi-worker concurrency testing yet
+- Basic queue metadata still needs to be improved
+
+## Next Milestone
+Implement stale-job detection and recovery:
+1. Track worker/job claim metadata
+2. Detect jobs stuck in processing
+3. Requeue stale jobs
+4. Introduce retry attempts
+5. Add exponential backoff
+6. Eventually route permanently failing jobs to a Dead Letter Queue
+
+## Interview Focus
+- Why Redis instead of an in-memory array?
+- Why Redis instead of PostgreSQL?
+- Why use a Redis List?
+- Why does `LPUSH + RPOP` provide FIFO?
+- Why must job claiming be atomic?
+- What is an in-flight job?
+- What is acknowledgement?
+- What happens if a worker crashes after claiming a job?
+- Why can recovery result in duplicate execution?
+- Why is exactly-once processing difficult?
