@@ -1,9 +1,10 @@
 const express = require("express");
 const app = express();
 const {createJob} = require("./jobs/job");
-const { enqueue, dequeue } = require("./queue/queue");
-const { processNextJob, startWorker } = require("./workers/worker");
+const { enqueue } = require("./queue/queue");
 const { connectRedis } = require("./config/redis");
+
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -12,47 +13,38 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/jobs",async (req, res) => {
-    if(!req.body.type || !req.body.payload || typeof req.body.type !== "string" || typeof req.body.payload !== "object") {
-        return res.status(400).json({error: "Missing type or payload or invalid type/payload"});
+    try {
+        if(!req.body.type || !req.body.payload || typeof req.body.type !== "string" || typeof req.body.payload !== "object") {
+            return res.status(400).json({error: "Missing type or payload or invalid type/payload"});
+        }
+
+        const job =createJob(req.body.type, req.body.payload);
+        await enqueue(job);
+        res.json(job);
+    } catch (error) {
+        console.error("Failed to enqueue job:", error);
+        res.status(500).json({ error: "Unable to enqueue job" });
     }
-   const job =createJob(req.body.type, req.body.payload);
-   await enqueue(job);
-   res.json(job);
-});
-
-app.get("/jobs/next", async (req, res) => {
-    const job = await dequeue();
-
-    if (!job) {
-        return res.status(404).json({
-            error: "No jobs available"
-        });
-    }
-
-    res.json(job);
-});
-
-app.post("/jobs/process", (req, res) => {
-    const job = processNextJob();
-
-    if (!job) {
-    return res.status(404).json({
-        error: "No jobs available"
-    });
-    }
-    res.json(job);
 });
 
 
 
 async function startServer() {
-    await connectRedis();
+    try {
+        await connectRedis();
 
-    startWorker();
+        const server = app.listen(port, () => {
+            console.log(`API server is running on port ${port}`);
+        });
 
-    app.listen(3000, () => {
-        console.log("Server is running on port 3000");
-    });
+        server.on("error", (error) => {
+            console.error("API server failed to start:", error);
+            process.exitCode = 1;
+        });
+    } catch (error) {
+        console.error("Unable to connect API server to Redis:", error);
+        process.exitCode = 1;
+    }
 }
 
 startServer();

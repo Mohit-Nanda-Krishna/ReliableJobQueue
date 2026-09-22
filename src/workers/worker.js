@@ -28,9 +28,22 @@ async function processNextJob() {
 }
 
 function startWorker() {
+    let isProcessing = false;
 
-    setInterval(async () => {
-        await processNextJob();
+    return setInterval(() => {
+        if (isProcessing) {
+            return;
+        }
+
+        isProcessing = true;
+
+        processNextJob()
+            .catch((error) => {
+                console.error("Failed to process job:", error);
+            })
+            .finally(() => {
+                isProcessing = false;
+            });
     }, 1000);
 
 }

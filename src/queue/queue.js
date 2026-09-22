@@ -10,16 +10,6 @@ async function enqueue(job) {
     );
 }
 
-async function dequeue() {
-    const job = await redisClient.rPop(READY_QUEUE);
-
-    if (!job) {
-        return null;
-    }
-
-    return JSON.parse(job);
-}
-
 async function claimJob() {
 
     const rawJob = await redisClient.rPopLPush(
@@ -48,7 +38,6 @@ async function acknowledgeJob(rawJob) {
 
 module.exports = {
     enqueue,
-    dequeue,
     claimJob,
     acknowledgeJob
 };
