@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 const { createJob } = require("./jobs/job");
-const { enqueue, getJob, checkQueueFormat } = require("./queue/queue");
+const { enqueue, getJob, getDeadJobIds, checkQueueFormat } = require("./queue/queue");
 const { connectRedis, redisClient } = require("./config/redis");
 
 const port = process.env.PORT || 3000;
@@ -18,12 +18,26 @@ app.post("/jobs", async (req, res) => {
             return res.status(400).json({error: "Missing type or payload or invalid type/payload"});
         }
 
-        const job = createJob(req.body.type, req.body.payload);
+        const maxAttempts = req.body.maxAttempts === undefined ? 3 : req.body.maxAttempts;
+        if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10) {
+            return res.status(400).json({ error: "maxAttempts must be an integer between 1 and 10" });
+        }
+        const job = createJob(req.body.type, req.body.payload, maxAttempts);
         await enqueue(job);
         res.json(job);
     } catch (error) {
         console.error("Failed to enqueue job:", error);
         res.status(500).json({ error: "Unable to enqueue job" });
+    }
+});
+
+// Register before /jobs/:id so "dead" is not interpreted as a job ID.
+app.get("/jobs/dead", async (req, res) => {
+    try {
+        res.json({ ids: await getDeadJobIds() });
+    } catch (error) {
+        console.error("Failed to read dead jobs:", error);
+        res.status(500).json({ error: "Unable to read dead jobs" });
     }
 });
 
